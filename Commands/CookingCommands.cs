@@ -11,7 +11,6 @@ using DSharpPlus.Interactivity.Enums;
 using DSharpPlus.Interactivity.EventHandling;
 using DSharpPlus.Interactivity.Extensions;
 using DSharpPlus.SlashCommands;
-using DSharpPlus.SlashCommands.Attributes;
 
 using CookingBot.Data;
 using CookingBot.Checks;
@@ -90,6 +89,223 @@ namespace CookingBot.Commands
                 .WithAuthor(name: owner.Username, iconUrl: owner.AvatarUrl);
 
             await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(eb.Build()));
+        }
+
+        [SlashCommand("Timer", "Starts a timer for you")]
+        public async Task TimerCommand(InteractionContext ctx, [Option("For", "What the timer is for")] string reason = "", [Option("Seconds", "The total seconds you want the timer to take")] long seconds = 0, [Option("Minutes", "The total minutes you want the timer to take")] long minutes = 0)
+        {
+            await ctx.DeferAsync();
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Started the timer"));
+
+            Log.Information(LogStructures.CommandExecutedStructure, "Timer", ctx.User.Username, ctx.User.Id);
+
+            bool defaultTimer = (seconds <= 0 && minutes <= 0);
+            var totalTime = defaultTimer ? 5 * 60 * 1000 : seconds * 1000 + (minutes * 60) * 1000;
+            await Task.Delay((int)totalTime);
+            if (string.IsNullOrEmpty(reason))
+            {
+                await ctx.Channel.SendMessageAsync("Your timer is done " + ctx.User.Mention);
+            }
+            else
+            {
+                await ctx.Channel.SendMessageAsync("Your timer for \"" + reason + "\" is done " + ctx.User.Mention);
+            }
+            Log.Information("Timer is done");
+        }
+
+        [SlashCommandGroup("Convert", "Convert units between metric and imperial")]
+        public class ConvertCommandGroup
+        {
+
+            [SlashCommand("Temperature", "Convert temperature units between metric and imperial")]
+            public async Task ConvertTemperatureCommand(InteractionContext ctx, [Option("Conversion", "The type of conversion you wish to make")] UnitConverterTemperature converter, [Option("Value", "The number you want to convert")] long val)
+            {
+                await ctx.DeferAsync();
+
+                string response = string.Empty;
+                switch (converter)
+                {
+                    case UnitConverterTemperature.CelsiusToFahrenheit:
+                        var ctf = (val * 9f / 5f) + 32f;
+                        response = $"{val}°C = {ctf}°F";
+                        break;
+
+                    case UnitConverterTemperature.FahrenheitToCelsius:
+                        var ftc = (val - 32f) * 5f / 9f;
+                        response = $"{val}°F = {ftc}°C";
+                        break;
+                }
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(response));
+                Log.Information(LogStructures.CommandExecutedStructure, "Convert - Temperature", ctx.User.Username, ctx.User.Id);
+            }
+
+            [SlashCommand("Mass", "Convert mass units between metric and imperial")]
+            public async Task ConvertMassCommand(InteractionContext ctx, [Option("From", "The unit type to convert from")] UnitConverterMass fromType, [Option("To", "The unit type to convert to")] UnitConverterMass toType, [Option("Value", "The number you want to convert")] long val)
+            {
+                await ctx.DeferAsync();
+
+                string response = string.Empty;
+
+                switch (fromType)
+                {
+                    case UnitConverterMass.Kilogram:
+                        switch (toType)
+                        {
+                            case UnitConverterMass.Kilogram:
+                                response = $"{val}Kg = {val}Kg";
+                                break;
+
+                            case UnitConverterMass.Gram:
+                                var kgtg = val * 1000;
+                                response = $"{val}Kg = {kgtg}g";
+                                break;
+
+                            case UnitConverterMass.Milligram:
+                                var kgtmg = val * 1000000;
+                                response = $"{val}Kg = {kgtmg}mg";
+                                break;
+
+                            case UnitConverterMass.Pound:
+                                var kgtp = val * 2.205;
+                                response = $"{val}Kg ~= {kgtp}pounds";
+                                break;
+
+                            case UnitConverterMass.Ounce:
+                                var kgto = val * 35.274;
+                                response = $"{val}Kg = {kgto}ounce";
+                                break;
+                        }
+                        break;
+
+                    case UnitConverterMass.Gram:
+                        switch (toType)
+                        {
+                            case UnitConverterMass.Kilogram:
+                                var gtkg = val / 1000;
+                                response = $"{val}g = {gtkg}Kg";
+                                break;
+
+                            case UnitConverterMass.Gram:
+                                response = $"{val}g = {val}g";
+                                break;
+
+                            case UnitConverterMass.Milligram:
+                                var gtmg = val * 1000;
+                                response = $"{val}g = {gtmg}mg";
+                                break;
+
+                            case UnitConverterMass.Pound:
+                                var gtp = val / 453.6;
+                                response = $"{val}g ~= {gtp}pounds";
+                                break;
+
+                            case UnitConverterMass.Ounce:
+                                var gto = val / 28.35;
+                                response = $"{val}g = {gto}ounce";
+                                break;
+                        }
+                        break;
+
+                    case UnitConverterMass.Milligram:
+                        switch (toType)
+                        {
+                            case UnitConverterMass.Kilogram:
+                                var mgtkg = val / 1000000;
+                                response = $"{val}mg = {mgtkg}Kg";
+                                break;
+
+                            case UnitConverterMass.Gram:
+                                var mgtg = val / 1000;
+                                response = $"{val}mg = {mgtg}g";
+                                break;
+
+                            case UnitConverterMass.Milligram:
+                                response = $"{val}mg = {val}mg";
+                                break;
+
+                            case UnitConverterMass.Pound:
+                                var mgtp = val / 453600;
+                                response = $"{val}mg ~= {mgtp}pounds";
+                                break;
+
+                            case UnitConverterMass.Ounce:
+                                var mgto = val / 28350;
+                                response = $"{val}mg = {mgto}ounce";
+                                break;
+                        }
+                        break;
+
+                    case UnitConverterMass.Pound:
+                        switch (toType)
+                        {
+                            case UnitConverterMass.Kilogram:
+                                var ptkg = val / 2.205;
+                                response = $"{val}pounds ~= {ptkg}Kg";
+                                break;
+
+                            case UnitConverterMass.Gram:
+                                var ptg = val * 453.6;
+                                response = $"{val}pounds ~= {ptg}g";
+                                break;
+
+                            case UnitConverterMass.Milligram:
+                                var ptmg = val * 453600;
+                                response = $"{val}pounds ~= {ptmg}mg";
+                                break;
+
+                            case UnitConverterMass.Pound:
+                                response = $"{val}pounds = {val}pounds";
+                                break;
+
+                            case UnitConverterMass.Ounce:
+                                var pto = val * 16;
+                                response = $"{val}pounds = {pto}ounce";
+                                break;
+                        }
+                        break;
+
+                    case UnitConverterMass.Ounce:
+                        switch (toType)
+                        {
+                            case UnitConverterMass.Kilogram:
+                                var otkg = val / 35.274;
+                                response = $"{val}ounce ~= {otkg}Kg";
+                                break;
+
+                            case UnitConverterMass.Gram:
+                                var otg = val * 28.35;
+                                response = $"{val}ounce ~= {otg}g";
+                                break;
+
+                            case UnitConverterMass.Milligram:
+                                var otmg = val * 28350;
+                                response = $"{val}ounce ~= {otmg}mg";
+                                break;
+
+                            case UnitConverterMass.Pound:
+                                var otp = val / 16;
+                                response = $"{val}ounce = {otp}pounds";
+                                break;
+
+                            case UnitConverterMass.Ounce:
+                                response = $"{val}ounce = {val}ounce";
+                                break;
+                        }
+                        break;
+                }
+
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(response));
+                Log.Information(LogStructures.CommandExecutedStructure, "Convert - Mass", ctx.User.Username, ctx.User.Id);
+            }
+
+            [SlashCommand("Volume", "Convert volume units between metric and imperial")]
+            public async Task ConvertVolumeCommand(InteractionContext ctx, [Option("From", "The unit type to convert from")] UnitConverterVolume fromType, [Option("To", "The unit type to convert to")] UnitConverterVolume toType, [Option("Value", "The number you want to convert")] long val)
+            {
+                await ctx.DeferAsync();
+
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("This command is currently work in progress, sorry for the delay."));
+                Log.Information(LogStructures.CommandExecutedStructure, "Convert - Volume", ctx.User.Username, ctx.User.Id);
+            }
         }
 
         [SlashCommand("Ping", "Gets the response time of the bot.")]
@@ -421,7 +637,7 @@ namespace CookingBot.Commands
             await channel.SendMessageAsync($"New recipe created, by user {recipe.Uploader}. Their id is {recipe.UploaderID}", recipe.BuildEmbed());
 
             Log.Information(LogStructures.RecipeCreatedStructure, recipe.Name, recipe.Uploader, recipe.UploaderID, recipe.Ingredients.Count, recipe.Steps.Count, recipe.GenerateIngredients(), recipe.GenerateSteps());
-    }
+        }
 
         [RequireManagerOrOwner]
         [SlashCommand("Remove", "Removes a recipe, only accessible to the owner to remove recipes that break the rules.")]
