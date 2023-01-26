@@ -241,9 +241,21 @@ namespace CookingBot.Data
             return recipe;
         }
 
-        //public async Task<List<Recipe>> GetRecipesByAsync(ulong user)
-        //{
+        public static async Task<List<string>> GetRecipesByAsync(ulong user)
+        {
+            var conn = await OpenConnectionAsync();
+            var cmd = new MySqlCommand("SELECT Name FROM recipes WHERE UploaderID = @user", conn);
+            cmd.Parameters.AddWithValue("user", user);
+            List<string> recipes = new();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                recipes.Add(reader.GetString("Name"));
+            }
 
-        //}
+            await reader.CloseAsync();
+            await CloseConnectionAsync(conn);
+            return recipes;
+        }
     }
 }

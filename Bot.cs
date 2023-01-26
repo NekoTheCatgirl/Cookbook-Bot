@@ -27,6 +27,8 @@ namespace CookingBot
         private const int ConnectionAttemptDelay = 1000;
         private static bool StopFlag = false;
 
+        private static bool ResetFlag = false;
+
         public static void SetStopFlag()
         {
             StopFlag = true;
@@ -78,7 +80,7 @@ namespace CookingBot
             {
                 PollBehaviour = PollBehaviour.DeleteEmojis,
                 Timeout = TimeSpan.FromMinutes(2),
-                ButtonBehavior = ButtonPaginationBehavior.Disable,
+                ButtonBehavior = ButtonPaginationBehavior.DeleteButtons,
                 AckPaginationButtons = true
             };
 
@@ -126,6 +128,14 @@ namespace CookingBot
                 await client.UpdateStatusAsync(activity, UserStatus.Online);
             };
 
+            client.Zombied += (sender, args) =>
+            {
+                ResetFlag = true;
+                StopFlag = true;
+
+                return Task.CompletedTask;
+            };
+
             DatabaseManager.OnRecipeCountChanged += UpdateStatusAsync;
 
             await client.StartAsync();
@@ -137,7 +147,17 @@ namespace CookingBot
 
             await client.StopAsync();
 
-            Log.Information("Thank you for using Cooking Bot.");
+            if (ResetFlag)
+            {
+                ResetFlag = false;
+                StopFlag = false;
+
+                await MainAsync(loggerFactory, token);
+            }
+            else
+            {
+                Log.Information("Thank you for using Cooking Bot.");
+            }
         }
 
         const string StatusFormatString = "Cooking {0} recipes!";

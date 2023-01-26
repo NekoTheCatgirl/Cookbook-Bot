@@ -29,7 +29,7 @@ namespace CookingBot.Commands
     {
         public Random Random { private get; set; }
 
-        private async Task<List<string>> GetRecipeNamesByTags(List<string> db, RecipeTags tags)
+        public static async Task<List<string>> GetRecipeNamesByTags(List<string> db, RecipeTags tags)
         {
             if (tags == RecipeTags.None)
                 return db;
@@ -50,6 +50,18 @@ namespace CookingBot.Commands
 
                 return recipeNames;
             }
+        }
+
+        public static async Task<DiscordEmbed> GetRecipeEmbed(InteractionContext ctx, Recipe recipe)
+        {
+            var user = await ctx.Client.GetUserAsync(recipe.UploaderID);
+
+            if (user != null)
+            {
+                return await recipe.BuildEmbedAsync(user.Username);
+            }
+
+            return recipe.BuildEmbed();
         }
 
         private static IEnumerable<Page> GeneratePagesFromEmbeds(List<DiscordEmbed> embeds)
@@ -318,79 +330,121 @@ namespace CookingBot.Commands
             await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Pong! Response time {ctx.Client.Ping}WS"));
         }
 
-        [SlashCommand("Cookbook", "Gets a cookbook of all the recipes added to this bot!")]
-        public async Task CookbookCommand(InteractionContext ctx, [Option("Tags", "The tags you wish to restrict the random result to")] RecipeTags tags = RecipeTags.None)
+        [SlashCommandGroup("Cookbook", "Gets a cookbook of all recipes added to the bot")]
+        public class CookbookCommandGroup
         {
-            await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
 
-            Log.Information(LogStructures.CommandExecutedStructure, "Cookbook", ctx.User.Username, ctx.User.Id);
-
-            var db = await GetRecipeNamesByTags(await DatabaseManager.GetRecipeNamesAsync(), tags);
-
-            if (db.Count == 0)
+            [SlashCommand("All", "Gets a cookbook of all the recipes added to this bot!")]
+            public async Task CookbookCommand(InteractionContext ctx, [Option("Tags", "The tags you wish to restrict the random result to")] RecipeTags tags = RecipeTags.None)
             {
-                Log.Warning(LogStructures.CommandErroredStructure, "Cookbook", "Cookbook is empty!");
-                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Sorry, it would seem the cookbook is empty!"));
-            }
-            else
-            {
-                var recipeEmbeds = new List<DiscordEmbed>();
+                await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
 
-                foreach (var recipe in db)
+                Log.Information(LogStructures.CommandExecutedStructure, "Cookbook - All", ctx.User.Username, ctx.User.Id);
+
+                var db = await GetRecipeNamesByTags(await DatabaseManager.GetRecipeNamesAsync(), tags);
+
+                if (db.Count == 0)
                 {
-                    var r = await DatabaseManager.GetRecipeAsync(recipe);
-                    if (r.HasValue)
-                        recipeEmbeds.Add(await GetRecipeEmbed(ctx, r.Value));
+                    Log.Warning(LogStructures.CommandErroredStructure, "Cookbook - All", "Cookbook is empty!");
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Sorry, it would seem the cookbook is empty!"));
                 }
-
-                var pages = GeneratePagesFromEmbeds(recipeEmbeds);
-
-                var message = await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Done getting cookbook, enjoy!"));
-
-                await Task.Delay(1000);
-
-                await message.DeleteAsync();
-
-                await ctx.Channel.SendPaginatedMessageAsync(ctx.User, pages, GeneratePaginationButtons(ctx.Client));
-            }
-        }
-
-        [SlashCommand("List", "Gets all the recipe names, in a list rather than individual pages")]
-        public async Task ListCommand(InteractionContext ctx, [Option("Tags", "The tags you wish to restrict the random result to")] RecipeTags tags = RecipeTags.None)
-        {
-            await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
-
-            Log.Information(LogStructures.CommandExecutedStructure, "List", ctx.User.Username, ctx.User.Id);
-
-            var db = await GetRecipeNamesByTags(await DatabaseManager.GetRecipeNamesAsync(), tags);
-
-            if (db.Count == 0)
-            {
-                Log.Warning(LogStructures.CommandErroredStructure, "List", "Cookbook is empty!");
-                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Sorry, it would seem the cookbook is empty!"));
-            }
-            else
-            {
-                var sb = new StringBuilder();
-
-                foreach (var recipe in db)
+                else
                 {
-                    var r = await DatabaseManager.GetRecipeAsync(recipe);
-                    if (r.HasValue)
-                        sb.AppendLine(r.Value.Name);
+                    var recipeEmbeds = new List<DiscordEmbed>();
+
+                    foreach (var recipe in db)
+                    {
+                        var r = await DatabaseManager.GetRecipeAsync(recipe);
+                        if (r.HasValue)
+                            recipeEmbeds.Add(await GetRecipeEmbed(ctx, r.Value));
+                    }
+
+                    var pages = GeneratePagesFromEmbeds(recipeEmbeds);
+
+                    var message = await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Done getting cookbook, enjoy!"));
+
+                    await Task.Delay(1000);
+
+                    await message.DeleteAsync();
+
+                    await ctx.Channel.SendPaginatedMessageAsync(ctx.User, pages, GeneratePaginationButtons(ctx.Client));
                 }
+            }
 
-                var inter = ctx.Client.GetInteractivity();
+            [SlashCommand("By", "Gets all recipe's made by a specific user!")]
+            public async Task ByCommand(InteractionContext ctx, [Option("User", "The user you want to get recipes from")] DiscordUser user, [Option("Tags", "The tags you wish to restrict the random result to")] RecipeTags tags = RecipeTags.None)
+            {
+                await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
 
-                var pages = inter.GeneratePagesInEmbed(sb.ToString(), SplitType.Line, new DiscordEmbedBuilder().WithTitle("Recipe list:"));
+                Log.Information(LogStructures.CommandExecutedStructure, "Cookbook - By", ctx.User.Username, ctx.User.Id);
 
-                var message = await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Done getting the list, enjoy!"));
+                var db = await GetRecipeNamesByTags(await DatabaseManager.GetRecipesByAsync(user.Id), tags);
 
-                await Task.Delay(1000);
+                if (db.Count == 0)
+                {
+                    Log.Warning(LogStructures.CommandErroredStructure, "Cookbook - By", "Cookbook is empty!");
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Sorry, it would seem the cookbook is empty!"));
+                }
+                else
+                {
+                    var recipeEmbeds = new List<DiscordEmbed>();
 
-                await message.DeleteAsync();
+                    foreach (var recipe in db)
+                    {
+                        var r = await DatabaseManager.GetRecipeAsync(recipe);
+                        if (r.HasValue)
+                            recipeEmbeds.Add(await GetRecipeEmbed(ctx, r.Value));
+                    }
 
-                await ctx.Channel.SendPaginatedMessageAsync(ctx.User, pages, GeneratePaginationButtons(ctx.Client));
+                    var pages = GeneratePagesFromEmbeds(recipeEmbeds);
+
+                    var message = await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Done getting cookbook, enjoy!"));
+
+                    await Task.Delay(1000);
+
+                    await message.DeleteAsync();
+
+                    await ctx.Channel.SendPaginatedMessageAsync(ctx.User, pages, GeneratePaginationButtons(ctx.Client));
+                }
+            }
+
+            [SlashCommand("List", "Gets all the recipe names, in a list rather than individual pages")]
+            public async Task ListCommand(InteractionContext ctx, [Option("Tags", "The tags you wish to restrict the random result to")] RecipeTags tags = RecipeTags.None)
+            {
+                await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
+
+                Log.Information(LogStructures.CommandExecutedStructure, "Cookbook - List", ctx.User.Username, ctx.User.Id);
+
+                var db = await GetRecipeNamesByTags(await DatabaseManager.GetRecipeNamesAsync(), tags);
+
+                if (db.Count == 0)
+                {
+                    Log.Warning(LogStructures.CommandErroredStructure, "Cookbook - List", "Cookbook is empty!");
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Sorry, it would seem the cookbook is empty!"));
+                }
+                else
+                {
+                    var sb = new StringBuilder();
+
+                    foreach (var recipe in db)
+                    {
+                        var r = await DatabaseManager.GetRecipeAsync(recipe);
+                        if (r.HasValue)
+                            sb.AppendLine(r.Value.Name);
+                    }
+
+                    var inter = ctx.Client.GetInteractivity();
+
+                    var pages = inter.GeneratePagesInEmbed(sb.ToString(), SplitType.Line, new DiscordEmbedBuilder().WithTitle("Recipe list:"));
+
+                    var message = await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("Done getting the list, enjoy!"));
+
+                    await Task.Delay(1000);
+
+                    await message.DeleteAsync();
+
+                    await ctx.Channel.SendPaginatedMessageAsync(ctx.User, pages, GeneratePaginationButtons(ctx.Client));
+                }
             }
         }
 
@@ -704,18 +758,6 @@ namespace CookingBot.Commands
                 Log.Warning(LogStructures.CommandErroredStructure, "Find", "Recipe does not exist");
                 await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("The specified recipe does not exist."));
             }
-        }
-
-        private async Task<DiscordEmbed> GetRecipeEmbed(InteractionContext ctx, Recipe recipe)
-        {
-            var user = await ctx.Client.GetUserAsync(recipe.UploaderID);
-
-            if (user != null)
-            {
-                return await recipe.BuildEmbedAsync(user.Username);
-            }
-
-            return recipe.BuildEmbed();
         }
 
         private class RandomValidRecipeResult
