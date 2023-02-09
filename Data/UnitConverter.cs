@@ -23,13 +23,4 @@ namespace CookingBot.Data
         [ChoiceName("Imperial - Ounce")]
         Ounce,
     }
-
-    public enum UnitConverterVolume
-    {
-        [ChoiceName("Metric - Liter")]
-        Liter,
-        [ChoiceName("Metric - Milliliter")]
-        Milliliter,
-
-    }
 }

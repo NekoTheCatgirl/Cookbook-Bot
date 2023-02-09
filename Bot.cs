@@ -66,12 +66,13 @@ namespace CookingBot
             var services = new ServiceCollection()
                 .AddSingleton<Random>()
                 .BuildServiceProvider();
-            
+
             var conf = new DiscordConfiguration()
             {
                 LoggerFactory = loggerFactory,
                 Token = token,
-                Intents = DiscordIntents.All
+                Intents = DiscordIntents.All,
+                LogUnknownEvents = false
             };
 
             client = new DiscordShardedClient(conf);

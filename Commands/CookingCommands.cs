@@ -309,15 +309,6 @@ namespace CookingBot.Commands
                 await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(response));
                 Log.Information(LogStructures.CommandExecutedStructure, "Convert - Mass", ctx.User.Username, ctx.User.Id);
             }
-
-            [SlashCommand("Volume", "Convert volume units between metric and imperial")]
-            public async Task ConvertVolumeCommand(InteractionContext ctx, [Option("From", "The unit type to convert from")] UnitConverterVolume fromType, [Option("To", "The unit type to convert to")] UnitConverterVolume toType, [Option("Value", "The number you want to convert")] long val)
-            {
-                await ctx.DeferAsync();
-
-                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent("This command is currently work in progress, sorry for the delay."));
-                Log.Information(LogStructures.CommandExecutedStructure, "Convert - Volume", ctx.User.Username, ctx.User.Id);
-            }
         }
 
         [SlashCommand("Ping", "Gets the response time of the bot.")]
