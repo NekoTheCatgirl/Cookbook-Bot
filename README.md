@@ -8,11 +8,11 @@ A discord cookbook bot. Now open sourced.
   * A stable host machine
 
   Installation:
-  1. Download the project
-  2. Open the AppCredentials.resx in Visual Studio
-  3. Set the token and other credentials to match your database
-  4. Compile the application
-  5. Run the compiled executable
+  1. Download the project.
+  2. Open the AppCredentials.resx in Visual Studio.
+  3. Set the token and other credentials to match your database.
+  4. Compile the application.
+  5. Run the compiled executable.
 
 ## Features:
   * A recipe database system.
