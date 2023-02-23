@@ -105,9 +105,6 @@ namespace CookingBot {
             }
         }
         
-        /// <summary>
-        ///   Looks up a localized string similar to MTA0MzE5NTQ5NTM5ODUwNjU2NQ.GSPBUn.wPLEs7IlDZJjbHozv15AJtflADI6GdN5tBoRVU.
-        /// </summary>
         internal static string Token {
             get {
                 return ResourceManager.GetString("Token", resourceCulture);
