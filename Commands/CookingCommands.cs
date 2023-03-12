@@ -103,6 +103,18 @@ namespace CookingBot.Commands
             await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(eb.Build()));
         }
 
+        struct TimerButtonID
+        {
+            public const string CANCEL_BUTTON_ID = "cancel_button";
+            public const string ADD_TIME_BUTTON_ID = "add_time_button";
+
+            public static bool IsAny(string id)
+            {
+                if (id == CANCEL_BUTTON_ID || id == ADD_TIME_BUTTON_ID) return true;
+                return false;
+            }
+        }
+
         [SlashCommand("Timer", "Starts a timer for you")]
         public async Task TimerCommand(InteractionContext ctx, [Option("For", "What the timer is for")] string reason = "", [Option("Seconds", "The total seconds you want the timer to take")] long seconds = 0, [Option("Minutes", "The total minutes you want the timer to take")] long minutes = 0)
         {
@@ -111,18 +123,100 @@ namespace CookingBot.Commands
 
             Log.Information(LogStructures.CommandExecutedStructure, "Timer", ctx.User.Username, ctx.User.Id);
 
-            bool defaultTimer = (seconds <= 0 && minutes <= 0);
-            var totalTime = defaultTimer ? 5 * 60 * 1000 : seconds * 1000 + (minutes * 60) * 1000;
-            await Task.Delay((int)totalTime);
-            if (string.IsNullOrEmpty(reason))
+            if (seconds <= 0 && minutes <= 0)
             {
-                await ctx.Channel.SendMessageAsync("Your timer is done " + ctx.User.Mention);
+                minutes = 5;
             }
-            else
+            var totalTime = (int)(seconds + (minutes * 60));
+
+            var startTime = DateTime.Now;
+
+            string title = reason.Length > 0 ? $"Your timer for \"{reason}\" has been started" : $"Your timer has been started";
+
+            var embed = new DiscordEmbedBuilder()
+                .WithTitle(title)
+                .WithDescription($"Time remaining: {minutes:00}:{seconds:00}")
+                .WithAuthor(name: ctx.User.Username, iconUrl: ctx.User.AvatarUrl);
+
+            var cancelButton = new DiscordButtonComponent(ButtonStyle.Danger, TimerButtonID.CANCEL_BUTTON_ID, "Cancel", false);
+            var cancelButtonDisabled = new DiscordButtonComponent(ButtonStyle.Danger, TimerButtonID.CANCEL_BUTTON_ID, "Cancel", true);
+            var addTimeButton = new DiscordButtonComponent(ButtonStyle.Secondary, TimerButtonID.ADD_TIME_BUTTON_ID, "Add 5 minutes", false);
+            var addTimeButtonDisabled = new DiscordButtonComponent(ButtonStyle.Secondary, TimerButtonID.ADD_TIME_BUTTON_ID, "Add 5 minutes", true);
+
+            var message = await ctx.FollowUpAsync(new DiscordFollowupMessageBuilder().AddEmbed(embed.Build()).AddComponents(cancelButton, addTimeButton));
+
+            int secondsElapsed = 0;
+
+            System.Timers.Timer timer = new();
+            timer.Interval = 1000;
+            timer.Elapsed += async (sender, e) =>
             {
-                await ctx.Channel.SendMessageAsync("Your timer for \"" + reason + "\" is done " + ctx.User.Mention);
-            }
-            Log.Information("Timer is done");
+                TimeSpan elapsedTime = DateTime.Now - startTime;
+                int remainingSeconds = totalTime - (int)elapsedTime.TotalSeconds;
+                if (remainingSeconds > 0)
+                {
+                    secondsElapsed++;
+                    if (secondsElapsed >= 1)
+                    {
+                        secondsElapsed = 0;
+
+                        int minutesRemaining = remainingSeconds / 60;
+                        int secondsRemaining = remainingSeconds % 60;
+
+                        embed.WithDescription($"Time remaining: {minutesRemaining:00}:{secondsRemaining:00}");
+
+                        await ctx.EditFollowupAsync(message.Id, new DiscordWebhookBuilder().AddEmbed(embed.Build()).AddComponents(cancelButton, addTimeButton));
+                    }
+                }
+                else
+                {
+                    timer.Stop();
+
+                    embed.WithDescription($"Timer is done.");
+
+                    await ctx.EditFollowupAsync(message.Id, new DiscordWebhookBuilder().AddEmbed(embed.Build()).AddComponents(cancelButtonDisabled, addTimeButtonDisabled));
+
+                    if (string.IsNullOrEmpty(reason))
+                    {
+                        await ctx.Channel.SendMessageAsync("Your timer is done " + ctx.User.Mention);
+                    }
+                    else
+                    {
+                        await ctx.Channel.SendMessageAsync("Your timer for \"" + reason + "\" is done " + ctx.User.Mention);
+                    }
+
+                    Log.Information("Timer is done");
+                }
+            };
+
+            ctx.Client.ComponentInteractionCreated += async (s, e) =>
+            {
+                if (TimerButtonID.IsAny(e.Id))
+                {
+                    await e.Interaction.DeferAsync(true);
+
+                    if (e.Id == TimerButtonID.CANCEL_BUTTON_ID)
+                    {
+                        timer.Stop();
+
+                        embed.WithDescription("Timer was canceled");
+
+                        await ctx.EditFollowupAsync(message.Id, new DiscordWebhookBuilder().AddEmbed(embed.Build()).AddComponents(cancelButtonDisabled, addTimeButtonDisabled));
+
+                        await e.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent("Canceled the timer"));
+                        Log.Information("Timer is canceled by user");
+                    }
+                    else if (e.Id == TimerButtonID.ADD_TIME_BUTTON_ID)
+                    {
+                        totalTime += 5 * 60;
+
+                        await e.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent("Added 5 minutes to the timer"));
+                        Log.Information("Timer is extended by 5 mins");
+                    }
+                }
+            };
+
+            timer.Start();
         }
 
         [SlashCommandGroup("Convert", "Convert units between metric and imperial")]
