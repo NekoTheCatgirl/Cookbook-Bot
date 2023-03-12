@@ -34,10 +34,31 @@ namespace CookingBot
             StopFlag = true;
         }
 
+        public static void SetResetFlag()
+        {
+            ResetFlag = true;
+            StopFlag = true;
+        }
+
+        public static bool ReadResetFlag()
+        {
+            return ResetFlag;
+        }
+
         DiscordShardedClient client;
 
-        public async Task MainAsync(ILoggerFactory loggerFactory, string token)
+        public async Task MainAsync(string token)
         {
+            ResetFlag = false;
+            StopFlag = false;
+
+            Log.Logger = new LoggerConfiguration()
+                .WriteTo.Console()
+                .WriteTo.File("log.txt")
+                .CreateLogger();
+
+            var loggerFactory = new LoggerFactory().AddSerilog();
+
             int connectionAttempts = 1;
 
             while (true)
@@ -97,7 +118,7 @@ namespace CookingBot
             foreach (var s in slash.Values)
             {
                 s.RegisterCommands<CookingCommands>();
-                s.RegisterCommands<Core>(1043194801723551774);
+                s.RegisterCommands<Core>();
 
                 s.SlashCommandErrored += async (s, e) =>
                 {
@@ -120,22 +141,9 @@ namespace CookingBot
                 };
             }
 
-            client.Ready += async (sender, args) =>
-            {
-                var db = await DatabaseManager.GetRecipeNamesAsync();
+            client.Ready += Client_Ready;
 
-                var activity = new DiscordActivity(string.Format(StatusFormatString, db.Count));
-
-                await client.UpdateStatusAsync(activity, UserStatus.Online);
-            };
-
-            client.Zombied += (sender, args) =>
-            {
-                ResetFlag = true;
-                StopFlag = true;
-
-                return Task.CompletedTask;
-            };
+            client.Zombied += Client_Zombied;
 
             DatabaseManager.OnRecipeCountChanged += UpdateStatusAsync;
 
@@ -148,17 +156,31 @@ namespace CookingBot
 
             await client.StopAsync();
 
-            if (ResetFlag)
-            {
-                ResetFlag = false;
-                StopFlag = false;
+            client.Ready -= Client_Ready;
 
-                await MainAsync(loggerFactory, token);
-            }
-            else
-            {
-                Log.Information("Thank you for using Cooking Bot.");
-            }
+            client.Zombied -= Client_Zombied;
+
+            DatabaseManager.OnRecipeCountChanged -= UpdateStatusAsync;
+
+            Log.Information("Thank you for using Cooking Bot.");
+        }
+
+        private Task Client_Zombied(DiscordClient sender, DSharpPlus.EventArgs.ZombiedEventArgs e)
+        {
+            Log.Fatal("Connection Zombied, unable to continue operations as normal.");
+
+            StopFlag = true;
+
+            return Task.CompletedTask;
+        }
+
+        private async Task Client_Ready(DiscordClient sender, DSharpPlus.EventArgs.ReadyEventArgs e)
+        {
+            var db = await DatabaseManager.GetRecipeNamesAsync();
+
+            var activity = new DiscordActivity(string.Format(StatusFormatString, db.Count));
+
+            await client.UpdateStatusAsync(activity, UserStatus.Online);
         }
 
         const string StatusFormatString = "Cooking {0} recipes!";
