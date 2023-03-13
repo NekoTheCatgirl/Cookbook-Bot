@@ -117,6 +117,7 @@ namespace CookingBot
 
             foreach (var s in slash.Values)
             {
+                s.RegisterCommands<TimerCommandModule>();
                 s.RegisterCommands<CookingCommands>();
                 s.RegisterCommands<Core>();
 
@@ -144,6 +145,8 @@ namespace CookingBot
             client.Ready += Client_Ready;
 
             client.Zombied += Client_Zombied;
+
+            client.ComponentInteractionCreated += TimerCommandModule.TimerComponentInteractionCreated;
 
             DatabaseManager.OnRecipeCountChanged += UpdateStatusAsync;
 
